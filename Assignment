@@ -1,1 +1,322 @@
+#include <iostream>
+#include <vector>
+#include <string>
+#include <ctime>
+#include <algorithm>
 
+using namespace std;
+
+// ======================= UTILITY =======================
+string currentTime() {
+    time_t now = time(0);
+    return ctime(&now);
+}
+
+// ======================= CITIZEN =======================
+class Citizen {
+    int citizenID;
+    string name, contact, address;
+
+public:
+    Citizen(int id = 0, string n = "", string c = "", string a = "") {
+        citizenID = id;
+        name = n;
+        contact = c;
+        address = a;
+    }
+
+    int getID() { return citizenID; }
+
+    void display() {
+        cout << "ID: " << citizenID << "\nName: " << name
+             << "\nContact: " << contact << "\nAddress: " << address << endl;
+    }
+};
+
+// ======================= COMPLAINT =======================
+class Complaint {
+public:
+    static int totalComplaints;
+    static int activeComplaints;
+
+    int complaintID;
+    string category, description, location;
+    string status;
+    int priorityScore;
+    string priorityLevel;
+    string assignedTeam;
+
+    vector<string> history;
+
+    Complaint(int id, string cat, string desc, string loc) {
+        complaintID = id;
+        category = cat;
+        description = desc;
+        location = loc;
+        status = "REPORTED";
+        priorityScore = 0;
+        priorityLevel = "LOW";
+
+        totalComplaints++;
+        activeComplaints++;
+    }
+
+    void addHistory(string entry) {
+        history.push_back(entry);
+    }
+
+    void display() {
+        cout << "\nComplaint ID: " << complaintID
+             << "\nCategory: " << category
+             << "\nDescription: " << description
+             << "\nLocation: " << location
+             << "\nStatus: " << status
+             << "\nPriority: " << priorityLevel
+             << "\nAssigned Team: " << assignedTeam << endl;
+    }
+
+    bool operator>(const Complaint &other) const {
+        return priorityScore > other.priorityScore;
+    }
+};
+
+int Complaint::totalComplaints = 0;
+int Complaint::activeComplaints = 0;
+
+// ======================= PRIORITY MANAGER =======================
+class PriorityManager {
+public:
+    int getCategoryWeight(string cat) {
+        if (cat == "Emergency") return 5;
+        if (cat == "Electrical") return 4;
+        if (cat == "Water") return 3;
+        if (cat == "Road") return 3;
+        if (cat == "Sanitation") return 2;
+        return 1;
+    }
+
+    int calculatePriority(Complaint &c) {
+        int weight = getCategoryWeight(c.category);
+        int waitingFactor = rand() % 5;
+
+        int score = (weight * 3) + (waitingFactor * 2);
+        c.priorityScore = score;
+
+        if (score >= 12) c.priorityLevel = "HIGH";
+        else if (score >= 7) c.priorityLevel = "MEDIUM";
+        else c.priorityLevel = "LOW";
+
+        return score;
+    }
+};
+
+// ======================= ABSTRACT RESPONSE TEAM =======================
+class ResponseTeam {
+protected:
+    int teamID;
+    string teamName;
+    string categoryHandled;
+
+public:
+    int capacity;
+    int workload;
+
+    ResponseTeam(int id, string name, string cat, int cap) {
+        teamID = id;
+        teamName = name;
+        categoryHandled = cat;
+        capacity = cap;
+        workload = 0;
+    }
+
+    virtual void respond(Complaint &c) = 0;
+
+    bool handles(string cat) {
+        return cat == categoryHandled;
+    }
+
+    virtual string getName() {
+        return teamName;
+    }
+
+    ResponseTeam operator+(const ResponseTeam &other) {
+        ResponseTeam temp = *this;
+        temp.capacity = this->capacity + other.capacity;
+        temp.workload = this->workload + other.workload;
+        return temp;
+    }
+
+    virtual ~ResponseTeam() {}
+};
+
+// ======================= DERIVED CLASSES =======================
+class SanitationUnit : public ResponseTeam {
+public:
+    SanitationUnit(int id) : ResponseTeam(id, "Sanitation Team", "Sanitation", 5) {}
+
+    void respond(Complaint &c) override {
+        cout << "Sanitation team handling complaint " << c.complaintID << endl;
+        workload++;
+        c.assignedTeam = "Sanitation";
+    }
+};
+
+class RoadUnit : public ResponseTeam {
+public:
+    RoadUnit(int id) : ResponseTeam(id, "Road Team", "Road", 4) {}
+
+    void respond(Complaint &c) override {
+        cout << "Road team fixing complaint " << c.complaintID << endl;
+        workload++;
+        c.assignedTeam = "Road";
+    }
+};
+
+class ElectricalUnit : public ResponseTeam {
+public:
+    ElectricalUnit(int id) : ResponseTeam(id, "Electrical Team", "Electrical", 3) {}
+
+    void respond(Complaint &c) override {
+        cout << "Electrical team resolving complaint " << c.complaintID << endl;
+        workload++;
+        c.assignedTeam = "Electrical";
+    }
+};
+
+class WaterUnit : public ResponseTeam {
+public:
+    WaterUnit(int id) : ResponseTeam(id, "Water Team", "Water", 3) {}
+
+    void respond(Complaint &c) override {
+        cout << "Water team fixing complaint " << c.complaintID << endl;
+        workload++;
+        c.assignedTeam = "Water";
+    }
+};
+
+class PublicSafetyUnit : public ResponseTeam {
+public:
+    PublicSafetyUnit(int id) : ResponseTeam(id, "Safety Team", "Emergency", 2) {}
+
+    void respond(Complaint &c) override {
+        cout << "Emergency team handling complaint " << c.complaintID << endl;
+        workload++;
+        c.assignedTeam = "Emergency";
+    }
+};
+
+// ======================= COMPLAINT MANAGER =======================
+class ComplaintManager {
+public:
+    vector<Complaint> complaints;
+
+    void addComplaint(Complaint c) {
+        complaints.push_back(c);
+    }
+
+    void sortComplaints() {
+        sort(complaints.begin(), complaints.end(),
+             [](Complaint a, Complaint b) { return a > b; });
+    }
+
+    void displayAll() {
+        for (auto &c : complaints)
+            c.display();
+    }
+};
+
+// ======================= RESPONSE MANAGER =======================
+class ResponseManager {
+public:
+    vector<ResponseTeam*> teams;
+
+    void addTeam(ResponseTeam *t) {
+        teams.push_back(t);
+    }
+
+    void dispatch(ComplaintManager &cm) {
+        cm.sortComplaints();
+
+        for (auto &c : cm.complaints) {
+            if (c.status != "REPORTED") continue;
+
+            ResponseTeam *best = NULL;
+
+            for (auto t : teams) {
+                if (t->handles(c.category) && t->workload < t->capacity) {
+                    if (best == NULL || t->workload < best->workload)
+                        best = t;
+                }
+            }
+
+            if (best != NULL) {
+                best->respond(c);
+                c.status = "ASSIGNED";
+            } else {
+                cout << "No team available\n";
+            }
+        }
+    }
+};
+
+// ======================= MAIN SYSTEM =======================
+int main() {
+    vector<Citizen> citizens;
+    ComplaintManager cm;
+    PriorityManager pm;
+    ResponseManager rm;
+
+    // Teams
+    rm.addTeam(new SanitationUnit(1));
+    rm.addTeam(new RoadUnit(2));
+    rm.addTeam(new ElectricalUnit(3));
+    rm.addTeam(new WaterUnit(4));
+    rm.addTeam(new PublicSafetyUnit(5));
+
+    int choice;
+    int citizenID = 1, complaintID = 1;
+
+    while (true) {
+        cout << "\n===== SMART CIVIC SYSTEM =====\n";
+        cout << "1. Register Citizen\n";
+        cout << "2. Register Complaint\n";
+        cout << "3. Process Complaints\n";
+        cout << "4. View Complaints\n";
+        cout << "5. Exit\n";
+        cout << "Enter choice: ";
+        cin >> choice;
+
+        if (choice == 1) {
+            string name, contact, address;
+            cout << "Enter name: "; cin >> name;
+            cout << "Enter contact: "; cin >> contact;
+            cout << "Enter address: "; cin >> address;
+
+            citizens.push_back(Citizen(citizenID++, name, contact, address));
+        }
+
+        else if (choice == 2) {
+            string cat, desc, loc;
+            cout << "Category (Sanitation/Road/Electrical/Water/Emergency): ";
+            cin >> cat;
+            cout << "Description: "; cin >> desc;
+            cout << "Location: "; cin >> loc;
+
+            Complaint c(complaintID++, cat, desc, loc);
+            pm.calculatePriority(c);
+            cm.addComplaint(c);
+        }
+
+        else if (choice == 3) {
+            rm.dispatch(cm);
+        }
+
+        else if (choice == 4) {
+            cm.displayAll();
+        }
+
+        else break;
+    }
+
+    return 0;
+}
